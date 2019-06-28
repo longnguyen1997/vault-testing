@@ -6,13 +6,13 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509 import DNSName
 from cryptography.x509 import IPAddress
 from cryptography.x509.oid import NameOID
-from ipaddress import IPv4Address
+from ipaddress import ip_address
 import sys
 
 
 def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
     '''
-    Returns an X509 CSR in 
+    Returns an X509 CSR in
     cryptography.hazmat.backends.openssl.x509._CertificateSigningRequest
     format. See documentation for more details on how to sign.
 
@@ -43,10 +43,11 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
     # Convert the SANs to Python objects.
     sans_converted = []
     for san in sans:
+        print(san)
         if san == 'IP':
             ip_addresses = sans[san]
-            for ip_address in ip_addresses:
-                sans_converted.append(IPAddress(IPv4Address(ip_address)))
+            for ip in ip_addresses:
+                sans_converted.append(IPAddress(ip_address(ip)))
         if san == 'DNS':
             dns_names = sans[san]
             for dns_name in dns_names:
@@ -55,7 +56,7 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
     # Add the SANs to the CSR information.
     builder = builder.add_extension(
         x509.SubjectAlternativeName(sans_converted),
-        critical=False
+        critical=True
     )
 
     builder = builder.add_extension(
@@ -72,24 +73,29 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
 # # Example CSR generation call.
 # csr = generate_csr('etcd', '/tmp/authbs-certs.wTmw/etcd/peer/request.csr', '/tmp/authbs-certs.wTmw/etcd/peer/request.key',
 #                    '/tmp/authbs-certs.wTmw/etcd/peer/pki', {'IP': ['127.0.0.1', '10.5.1.16', '10.5.1.16', '10.5.1.16']})
-# # Print the CSR, PEM-encoded.
+# # Print the CSR, PEM-encoded bytes.
 # print(csr.public_bytes(Encoding.PEM))
 
-if __name__ == 'main':
+if __name__ == '__main__':
     args = sys.argv
     args.pop(0)
     params = []
     while args:
         params.append(args.pop(0))
-    try:
-        sans = {'IP': [], 'DNS': []}
-        sans_string = params[4]
-        kv_pairs = sans.split(',')
-        for pair in kv_pairs:
-            key, value = pair.split(':')
-            sans[key].append(value)
-        params[4] = sans
-    except:
-        pass
-    csr = generate_csr(*args)
-    print(csr)
+    for i in range(len(params)):
+                 print(params[i])
+
+    # Parse the subject alternative names (SANs).
+    sans = {'IP': [], 'DNS': []}
+    sans_string = params[4]
+    kv_pairs = sans_string.split(',')
+    for pair in kv_pairs:
+        key, value = pair.split(':')
+        sans[key].append(value)
+    params[4] = sans
+    csr = generate_csr(*params)
+
+    from time import time()
+
+    csr_file = open("/root/csrs/%s-%d" % (params[0], time()),"wb")
+    csr_file.write(csr.public_bytes(Encoding.PEM))
