@@ -32,6 +32,9 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
         backend=default_backend()
     )
 
+    key_file = open(private_key_path + "/request.key", "wb")
+    key_file.write(private_key.private_bytes(Encoding.PEM))
+
     # Add the basic attributes. Includes CN.
     builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
         # Provide various details about who we are.
@@ -70,6 +73,9 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
         private_key, hashes.SHA256(), default_backend()
     )
 
+    csr_file = open(csr_path + "/request.csr", "wb")
+    csr_file.write(csr.public_bytes(Encoding.PEM))
+
     return csr
 
 
@@ -93,10 +99,4 @@ if __name__ == '__main__':
 
     # Parse the subject alternative names (SANs).
     args[4] = parse_sans(args[4])
-
-    csr = generate_csr(*args)
-
-    # Write the csr file.
-    # TODO: This should be done in the generate_csr function.
-    csr_file = open("/root/csrs/%s-%d" % (args[0], time()), "wb")
-    csr_file.write(csr.public_bytes(Encoding.PEM))
+    generate_csr(*args)
