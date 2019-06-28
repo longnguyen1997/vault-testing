@@ -1,3 +1,5 @@
+import sys
+
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -7,7 +9,8 @@ from cryptography.x509 import DNSName
 from cryptography.x509 import IPAddress
 from cryptography.x509.oid import NameOID
 from ipaddress import ip_address
-import sys
+# TODO: Don't use time. csr_path and private_key_path still need to be fixed.
+from time import time
 
 
 def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
@@ -28,10 +31,9 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
         key_size=2048,
         backend=default_backend()
     )
-    builder = x509.CertificateSigningRequestBuilder()
 
     # Add the basic attributes. Includes CN.
-    builder = builder.subject_name(x509.Name([
+    builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
         # Provide various details about who we are.
         x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"California"),
@@ -70,32 +72,31 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
 
     return csr
 
-# # Example CSR generation call.
-# csr = generate_csr('etcd', '/tmp/authbs-certs.wTmw/etcd/peer/request.csr', '/tmp/authbs-certs.wTmw/etcd/peer/request.key',
-#                    '/tmp/authbs-certs.wTmw/etcd/peer/pki', {'IP': ['127.0.0.1', '10.5.1.16', '10.5.1.16', '10.5.1.16']})
-# # Print the CSR, PEM-encoded bytes.
-# print(csr.public_bytes(Encoding.PEM))
 
-if __name__ == '__main__':
-    args = sys.argv
-    args.pop(0)
-    params = []
-    while args:
-        params.append(args.pop(0))
-    for i in range(len(params)):
-                 print(params[i])
-
-    # Parse the subject alternative names (SANs).
+def parse_sans(sans_string):
+    '''
+    sans_string (str): Formatted like 'IP:192.169.0.1,DNS:kubernetes.default.svc', that is,
+                       IP and DNS SANs defined by colons and delineated by commas.
+    returns (dict): Dictionary mapping IP SANs to their values and same for DNS names.
+    '''
     sans = {'IP': [], 'DNS': []}
-    sans_string = params[4]
     kv_pairs = sans_string.split(',')
     for pair in kv_pairs:
         key, value = pair.split(':')
         sans[key].append(value)
-    params[4] = sans
-    csr = generate_csr(*params)
+    return sans
 
-    from time import time()
 
-    csr_file = open("/root/csrs/%s-%d" % (params[0], time()),"wb")
+if __name__ == '__main__':
+    args = sys.argv
+    args.pop(0)  # Remove script name from args.
+
+    # Parse the subject alternative names (SANs).
+    args[4] = parse_sans(args[4])
+
+    csr = generate_csr(*args)
+
+    # Write the csr file.
+    # TODO: This should be done in the generate_csr function.
+    csr_file = open("/root/csrs/%s-%d" % (args[0], time()), "wb")
     csr_file.write(csr.public_bytes(Encoding.PEM))
