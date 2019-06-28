@@ -1,6 +1,5 @@
 import hvac
 
-from generate_csr import *
 from os import getenv
 
 

@@ -7,6 +7,7 @@ from cryptography.x509 import DNSName
 from cryptography.x509 import IPAddress
 from cryptography.x509.oid import NameOID
 from ipaddress import IPv4Address
+import sys
 
 
 def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
@@ -19,7 +20,7 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
     csr_path (str): Path to store CSR file.
     private_key_path (str): Path to store private key.
     pki_dir (str): Path for PKI directory.
-    sans (dict: str -> str): Maps {types, ex. 'IP' -> values, ex. '10.5.1.16'}.
+    sans (dict: str -> str): Maps type to value {types, ex. 'IP' -> values, ex. '10.5.1.16'}.
     '''
 
     private_key = rsa.generate_private_key(
@@ -62,14 +63,33 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
     )
 
     # Sign the CSR with our private key.
-    request = builder.sign(
+    csr = builder.sign(
         private_key, hashes.SHA256(), default_backend()
     )
 
-    return request
+    return csr
 
-# Example CSR generation call.
-request = generate_csr('etcd', '/tmp/authbs-certs.wTmw/etcd/peer/request.csr', '/tmp/authbs-certs.wTmw/etcd/peer/request.key',
-                       '/tmp/authbs-certs.wTmw/etcd/peer/pki', {'IP': ['127.0.0.1', '10.5.1.16', '10.5.1.16', '10.5.1.16']})
-# Print the CSR, PEM-encoded.
-print(request.public_bytes(Encoding.PEM))
+# # Example CSR generation call.
+# csr = generate_csr('etcd', '/tmp/authbs-certs.wTmw/etcd/peer/request.csr', '/tmp/authbs-certs.wTmw/etcd/peer/request.key',
+#                    '/tmp/authbs-certs.wTmw/etcd/peer/pki', {'IP': ['127.0.0.1', '10.5.1.16', '10.5.1.16', '10.5.1.16']})
+# # Print the CSR, PEM-encoded.
+# print(csr.public_bytes(Encoding.PEM))
+
+if __name__ == 'main':
+    args = sys.argv
+    args.pop(0)
+    params = []
+    while args:
+        params.append(args.pop(0))
+    try:
+        sans = {'IP': [], 'DNS': []}
+        sans_string = params[4]
+        kv_pairs = sans.split(',')
+        for pair in kv_pairs:
+            key, value = pair.split(':')
+            sans[key].append(value)
+        params[4] = sans
+    except:
+        pass
+    csr = generate_csr(*args)
+    print(csr)
