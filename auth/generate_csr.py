@@ -5,12 +5,11 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import DNSName
 from cryptography.x509 import IPAddress
 from cryptography.x509.oid import NameOID
 from ipaddress import ip_address
-# TODO: Don't use time. csr_path and private_key_path still need to be fixed.
-from time import time
 
 
 def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
@@ -32,8 +31,11 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
         backend=default_backend()
     )
 
-    key_file = open(private_key_path + "/request.key", "wb")
-    key_file.write(private_key.private_bytes(Encoding.PEM))
+    key_file = open(private_key_path, "wb")
+    key_file.write(private_key.private_bytes(encoding=Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+        ))
 
     # Add the basic attributes. Includes CN.
     builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
@@ -41,14 +43,13 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
         x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"California"),
         x509.NameAttribute(NameOID.LOCALITY_NAME, u"Sunnyvale"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Platform9 Systems"),
         x509.NameAttribute(NameOID.COMMON_NAME, cn),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, str(org))
     ]))
 
     # Convert the SANs to Python objects.
     sans_converted = []
     for san in sans:
-        print(san)
         if san == 'IP':
             ip_addresses = sans[san]
             for ip in ip_addresses:
@@ -73,7 +74,7 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
         private_key, hashes.SHA256(), default_backend()
     )
 
-    csr_file = open(csr_path + "/request.csr", "wb")
+    csr_file = open(csr_path, "wb")
     csr_file.write(csr.public_bytes(Encoding.PEM))
 
     return csr
@@ -94,9 +95,14 @@ def parse_sans(sans_string):
 
 
 if __name__ == '__main__':
+
+    # <common_name> </path/to/csr> </path/to/key> <pki_dir> [sans] [org]
     args = sys.argv
     args.pop(0)  # Remove script name from args.
 
     # Parse the subject alternative names (SANs).
-    args[4] = parse_sans(args[4])
+    try:
+        args[4] = parse_sans(args[4])
+    except:
+        pass
     generate_csr(*args)
