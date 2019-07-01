@@ -12,7 +12,7 @@ from cryptography.x509.oid import NameOID
 from ipaddress import ip_address
 
 
-def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
+def generate_csr(cn, csr_path, private_key_path, sans={}, org=None):
     '''
     Returns an X509 CSR in
     cryptography.hazmat.backends.openssl.x509._CertificateSigningRequest
@@ -21,7 +21,6 @@ def generate_csr(cn, csr_path, private_key_path, pki_dir, sans={}, org=None):
     cn (str): Common name.
     csr_path (str): Path to store CSR file.
     private_key_path (str): Path to store private key.
-    pki_dir (str): Path for PKI directory.
     sans (dict: str -> str): Maps type to value {types, ex. 'IP' -> values, ex. '10.5.1.16'}.
     '''
 
@@ -96,13 +95,13 @@ def parse_sans(sans_string):
 
 if __name__ == '__main__':
 
-    # <common_name> </path/to/csr> </path/to/key> <pki_dir> [sans] [org]
+    # <common_name> </path/to/csr> </path/to/key> [sans] [org]
     args = sys.argv
     args.pop(0)  # Remove script name from args.
 
     # Parse the subject alternative names (SANs).
     try:
-        args[4] = parse_sans(args[4])
+        args[3] = parse_sans(args[3])
     except:
         pass
     generate_csr(*args)
