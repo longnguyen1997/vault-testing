@@ -1,13 +1,23 @@
 from os import system
-from vault import *
+from secrets_engines import *
+from signer import *
 
-try:
-	c = get_client()
-except:
-	exit()
 
-mock_root_ca(c)
-mock_cluster_init(c, 'long-testbed')
-generate_and_sign_intermediate(c, 'long-testbed')
+def test():
+    client = get_client(True)
+    disable_secrets_engine(client, 'pmk-ca-1199')
+    try:
+        data = generate_root_ca().json()['data']
+        print(data['certificate'])
+    except:
+        exit(1)
+    print(sign_csr('./req.csr').json()['data']['certificate'])
 
-# By this point, the cluster 'long-testbed' is ready to issue certs to hosts.
+
+def teardown():
+    client = get_client(True)
+    disable_secrets_engine(client, 'pmk-ca-1199')
+
+
+test()
+teardown()

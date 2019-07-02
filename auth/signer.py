@@ -1,13 +1,14 @@
 from hvac import Client as VaultClient
 from os import getenv
 from time import time
-from vault import *
+from secrets_engines import *
+
 
 def get_client(dev=False):
     if dev is False:
         return VaultClient(url=getenv(
             'VAULT_ADDR', 'http://127.0.0.1:8200'), token=getenv('VAULT_TOKEN'))
-    return VaultClient()
+    return VaultClient()  # No authentication needed if dev mode.
 
 
 def generate_root_ca(cluster_id='1199'):
@@ -18,8 +19,12 @@ def generate_root_ca(cluster_id='1199'):
     not already exist. This will be an internal PKI engine, so the private key is
     not exported.
 
-    Uses the Python HVAC Vault API: https://hvac.readthedocs.io/en/stable/usage/secrets_engines/pki.html.
+    Also generates a new Vault role, 'root', for this cluster CA to sign certs.
+
+    Uses the Python HVAC Vault API:
+    https://hvac.readthedocs.io/en/stable/usage/secrets_engines/pki.html.
     '''
+
     # Assumes Vault is on localhost if no information is found.
 
     vault_path = 'pmk-ca-' + cluster_id + '/'
@@ -31,22 +36,68 @@ def generate_root_ca(cluster_id='1199'):
         enable_new_pki_secrets_engine(
             client,
             vault_path,
-            description='PMK CA engine for cluster ' + cluster_id)
+            description='PMK CA engine for cluster UUID ' + cluster_id)
+    else:
+        # Prevent CA generation from ever happening more than once.
+        return
 
+    # Tune the max TTL for the CA certificate.
+    client.sys.tune_mount_configuration(
+        path=vault_path,
+        default_lease_ttl='47300h',  # 5 years by default.
+        max_lease_ttl='87600h',
+    )
+
+    # Generate root CA for this cluster.
+    # Private key is NOT ever exposed.
     ca_response = client.secrets.pki.generate_root(
-        type='internal', common_name=common_name, mount_point=vault_path)
+        type='internal',
+        common_name=common_name,
+        mount_point=vault_path,
+        extra_params={
+            'ttl': '87600h'
+        })
 
-    set_urls_response = client.secrets.pki.set_urls(
-                {
-                  'issuing_certificates': [getenv('VAULT_ADDR') + '/v1/' + vault_path + 'ca'],
-                    'crl_distribution_points': [getenv('VAULT_ADDR') + '/v1/' + vault_path + 'crl']
-                },
-                mount_point=vault_path
-            )
+    # Need the 'root' role to sign PMK CSRs.
+    create_root_role_response = client.secrets.pki.create_or_update_role(
+        'root',
+        {
+            'allow_any_name': 'true'
+        },
+        mount_point=vault_path
+    )
+
+    # Create a policy for later use with this cluster's hosts.
+    # TODO: Somehow push this policy to configuration for hosts to use later.
+    policy = \
+        '''
+    path "%s/*" {
+        capabilities = ["create", "read", "list"]
+    }
+    ''' % vault_path
+
+    return ca_response
 
 
-def sign_csr(csr_path, common_name, cluster_id='1199'):
+def read_root_ca(cluster_id='1199'):
+    '''
+    Get the CA certificate for the cluster UUID specified.
+    Returned as a string in '-----BEGIN ... -----END CERTIFICATE-----' format.
+    '''
+    return get_client(True).secrets.pki.read_ca_certificate(
+        mount_point='pmk-ca-' + cluster_id)
+
+
+def sign_csr(csr_path, cluster_id='1199'):
+    '''
+    Signs a CSR, given the path to its file.
+    Cluster UUID must also be specified.
+    '''
     with open(csr_path, 'r') as csr:
         csr_contents = csr.read()
-    get_client(True).secrets.pki.sign_certificate(
-        name=common_name, csr=csr_contents, common_name=common_name)
+    return get_client(True).secrets.pki.sign_certificate(
+        name='root',
+        csr=csr_contents,
+        common_name='',
+        mount_point='pmk-ca-' + cluster_id
+    )
