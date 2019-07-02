@@ -70,11 +70,11 @@ def generate_root_ca(cluster_id='1199'):
     # Create a policy for later use with this cluster's hosts.
     # TODO: Somehow push this policy to configuration for hosts to use later.
     policy = \
-        '''
-    path "%s/*" {
-        capabilities = ["create", "read", "list"]
-    }
-    ''' % vault_path
+'''
+path "%s/*" {
+    capabilities = ["create", "read", "list"]
+}
+''' % vault_path
 
     return ca_response
 
