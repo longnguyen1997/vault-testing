@@ -2,7 +2,8 @@ from hvac import Client as VaultClient
 from os import getenv
 from time import time
 from secrets_engines import *
-
+import sys
+from fire import Fire
 
 def get_client(dev=False):
     if dev is False:
@@ -95,9 +96,13 @@ def sign_csr(csr_path, cluster_id='1199'):
     '''
     with open(csr_path, 'r') as csr:
         csr_contents = csr.read()
-    return get_client(True).secrets.pki.sign_certificate(
+    signed_certificate = get_client(True).secrets.pki.sign_certificate(
         name='root',
         csr=csr_contents,
         common_name='',
         mount_point='pmk-ca-' + cluster_id
-    )
+    ).json()['data']['certificate']
+    print(signed_certificate)
+
+if __name__ == '__main__':
+    Fire() # Expose the functions to the command line. For sign_csr and read_root_ca only.
