@@ -1,16 +1,16 @@
 from hvac import Client as VaultClient
 from os import getenv
 from time import time
-
+from vault import *
 
 def get_client(dev=False):
     if dev is False:
-        return VaultClient(url=os.getenv(
-            'VAULT_ADDR', 'http://127.0.0.1:8200'), token=os.getenv('VAULT_TOKEN'))
+        return VaultClient(url=getenv(
+            'VAULT_ADDR', 'http://127.0.0.1:8200'), token=getenv('VAULT_TOKEN'))
     return VaultClient()
 
 
-def generate_root_ca(cluster_id='1199')
+def generate_root_ca(cluster_id='1199'):
     '''
     cluster_id (str): ID of the PMK cluster. Mocked to 1199.
 
@@ -36,7 +36,17 @@ def generate_root_ca(cluster_id='1199')
     ca_response = client.secrets.pki.generate_root(
         type='internal', common_name=common_name, mount_point=vault_path)
 
+    set_urls_response = client.secrets.pki.set_urls(
+                {
+                  'issuing_certificates': [getenv('VAULT_ADDR') + '/v1/' + vault_path + 'ca'],
+                    'crl_distribution_points': [getenv('VAULT_ADDR') + '/v1/' + vault_path + 'crl']
+                },
+                mount_point=vault_path
+            )
 
-def sign_csr(csr_path, cluster_id='1199')
+
+def sign_csr(csr_path, common_name, cluster_id='1199'):
+    with open(csr_path, 'r') as csr:
+        csr_contents = csr.read()
     get_client(True).secrets.pki.sign_certificate(
-        name='admin', csr=csr_path, common_name='admin')
+        name=common_name, csr=csr_contents, common_name=common_name)
