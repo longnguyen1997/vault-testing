@@ -28,6 +28,7 @@ def generate_root_ca(cluster_id='1199'):
 
     # Assumes Vault is on localhost if no information is found.
 
+    cluster_id = str(cluster_id)
     vault_path = 'pmk-ca-' + cluster_id + '/'
     common_name = 'kubernetes-ca@%d' % time()
 
@@ -86,7 +87,7 @@ def read_root_ca(cluster_id='1199'):
     Returned as a string in '-----BEGIN ... -----END CERTIFICATE-----' format.
     '''
     return get_client(True).secrets.pki.read_ca_certificate(
-        mount_point='pmk-ca-' + cluster_id)
+        mount_point='pmk-ca-' + str(cluster_id))
 
 
 def sign_csr(csr_path, cluster_id='1199'):
@@ -100,7 +101,7 @@ def sign_csr(csr_path, cluster_id='1199'):
         name='root',
         csr=csr_contents,
         common_name='',
-        mount_point='pmk-ca-' + cluster_id
+        mount_point='pmk-ca-' + str(cluster_id)
     ).json()['data']['certificate']
     print(signed_certificate)
 
