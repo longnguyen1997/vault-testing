@@ -39,9 +39,6 @@ def generate_root_ca(cluster_id='1199'):
             client,
             vault_path,
             description='PMK CA engine for cluster UUID ' + cluster_id)
-    else:
-        # Prevent CA generation from ever happening more than once.
-        return
 
     # Tune the max TTL for the CA certificate.
     client.sys.tune_mount_configuration(
@@ -90,7 +87,7 @@ def read_root_ca(cluster_id='1199'):
         mount_point='pmk-ca-' + str(cluster_id))
 
 
-def sign_csr(csr_path, cluster_id='1199'):
+def sign_csr(role, csr_path, cluster_id='1199'):
     '''
     Signs a CSR, given the path to its file.
     Cluster UUID must also be specified.
@@ -98,7 +95,7 @@ def sign_csr(csr_path, cluster_id='1199'):
     with open(csr_path, 'r') as csr:
         csr_contents = csr.read()
     signed_certificate = get_client(True).secrets.pki.sign_certificate(
-        name='root',
+        name=role,
         csr=csr_contents,
         common_name='',
         mount_point='pmk-ca-' + str(cluster_id)

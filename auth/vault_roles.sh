@@ -8,6 +8,7 @@ if [[ -z $VAULT_ADDR ]]; then
 	exit 1
 fi
 
+unset VAULT_ROLES
 declare -a VAULT_ROLES
 
 # These Vault roles are directly used in certificate management
@@ -33,26 +34,21 @@ populate_vault_roles
 # Must provide the cluster PKI engine path!
 function create_vault_roles() {
 
-	# Parse the roles accordingly based on cert type.
 	cluster_vault_pki_path=$1
 
+    # Parse based on cert type (client or server).
 	for role in "$VAULT_ROLES[@]"; do
-		if [[ $roles = *-server ]]; then # Server case.
-			vault write $cluster_vault_pki_path/roles/$role \
-					allow_any_name=true server_flag=true client_flag=false \
-					organization=Platform9\ Systems \
-					locality=Sunnyvale province=California country=USA
-		else
-			vault write $cluster_vault_pki_path/roles/$role \
-					allow_any_name=true server_flag=false client_flag=true \
-					organization=Platform9\ Systems \
-					locality=Sunnyvale province=California country=USA
-		fi
+		if [[ $role = *-server ]]; then
+            vault write $cluster_vault_pki_path/roles/$role \
+				allow_any_name=true server_flag=true client_flag=false
+        else
+            vault write $cluster_vault_pki_path/roles/$role \
+                allow_any_name=true server_flag=false client_flag=true
+        fi
 	done
 
 	# Last edge case: admin-client must have org. "system:masters" for K8S.
 	vault write $cluster_vault_pki_path/roles/admin-client \
-					allow_any_name=true server_flag=true client_flag=false \
-					organization=system:masters \
-					locality=Sunnyvale province=California country=USA
+					allow_any_name=true \
+					organization=system:masters
 }
