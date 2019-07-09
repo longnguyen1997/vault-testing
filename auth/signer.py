@@ -5,6 +5,7 @@ from secrets_engines import *
 import sys
 from fire import Fire
 
+
 def get_client(dev=False):
     if dev is False:
         return VaultClient(url=getenv(
@@ -57,19 +58,10 @@ def generate_root_ca(cluster_id='1199'):
             'ttl': '87600h'
         })
 
-    # Need the 'root' role to sign PMK CSRs.
-    create_root_role_response = client.secrets.pki.create_or_update_role(
-        'root',
-        {
-            'allow_any_name': 'true'
-        },
-        mount_point=vault_path
-    )
-
     # Create a policy for later use with this cluster's hosts.
     # TODO: Somehow push this policy to configuration for hosts to use later.
     policy = \
-'''
+        '''
 path "%s/*" {
     capabilities = ["create", "read", "list"]
 }
@@ -103,4 +95,6 @@ def sign_csr(role, csr_path, cluster_id='1199'):
     print(signed_certificate)
 
 if __name__ == '__main__':
-    Fire() # Expose the functions to the command line. For sign_csr and read_root_ca only.
+    # Expose the functions to the command line. For sign_csr and read_root_ca
+    # only.
+    Fire()
