@@ -11,27 +11,30 @@ function generate_root_ca() {
 	# If the PKI engine hasn't already been made, do so.
 	if ! vault secrets list | grep -q $cluster_pki_path; then
 		vault secrets enable \
-			-path=$cluster_pki_path pki \
-			-description="Vault CA engine for cluster $cluster_id"
-	fi
-	# 10 years of CA lifetime.
+	        -description="Vault CA engine for cluster $cluster_id" \
+            -path=$cluster_pki_path pki
+    else
+        return 1
+    fi
 	vault secrets tune -max-lease-ttl=87600h $cluster_pki_path
 	vault write \
 		$cluster_pki_path/root/generate/internal \
-        common_name=kubernetes-ca@`date +%s`
+        common_name=kubernetes-ca@`date +%s` \
+        ttl=43800h > /dev/null # 5 years of CA lifetime.
+    echo "Successfully generated Vault PKI engine at path '$cluster_pki_path'."
 }
 
 
 function sign_csr() {
-	
+
 	local vault_role=$1
 	local csr_filepath=$2
 	local certs_dir=$3
-	
+
 	# Vault tokens must be in place to contact the remote
 	# Vault server running on the DU.
 	# `vault write` will refer to $VAULT_ADDR for the remote.
-	vault write pmk-$cluster_id/sign/$vault_role \
+	vault write pmk-ca-$CLUSTER_ID/sign/$vault_role \
 		csr=@$csr_filepath -format=json \
 		> $certs_dir/request.json
 

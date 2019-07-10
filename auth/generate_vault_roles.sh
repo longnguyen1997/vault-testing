@@ -10,5 +10,5 @@ fi
 
 source vault_roles.sh
 
-if [[ -z $CLUSTER_PATH ]]; then echo "Please set \$CLUSTER_PATH for this cluster's Vault PKI engine.";
-else create_vault_roles $CLUSTER_PATH; fi
+if [[ -z $CLUSTER_ID ]]; then echo "Please set \$CLUSTER_ID.";
+else create_vault_roles pmk-ca-$CLUSTER_ID; fi
